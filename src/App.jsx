@@ -12,21 +12,46 @@ export default function App() {
   const [etape, setEtape] = useState('menu');
   const [mode, setMode] = useState(null);
   const [difficulte, setDifficulte] = useState(null);
-  const [historique, setHistorique] = useState({ joueur: [], ia: [] });
-  const [score, setScore] = useState({ X: 0, O: 0 });
+  const [historique, setHistorique] = useState({ joueur: [], ia: { facile: [], moyenne: [], difficile: [] } });
+  const [score, setScore] = useState({
+    joueur: { X: 0, O: 0 },
+    ia: { facile: { X: 0, O: 0 }, moyenne: { X: 0, O: 0 }, difficile: { X: 0, O: 0 } }
+  });
 
+  // Lorsqu'une partie se termine, on met à jour l'historique et le score
   useEffect(() => {
     if (etat?.terminé && etat.gagnant) {
       if (etat.gagnant !== 'nul') {
-        setScore((s) => ({ ...s, [etat.gagnant]: s[etat.gagnant] + 1 }));
+        setScore((s) => ({
+          ...s,
+          [mode]: mode === 'ia' ? {
+            ...s[mode],
+            [difficulte]: {
+              ...s[mode][difficulte],
+              [etat.gagnant]: s[mode][difficulte][etat.gagnant] + 1
+            }
+          } : {
+            ...s[mode],
+            [etat.gagnant]: s[mode][etat.gagnant] + 1
+          }
+        }));
       }
       setHistorique((h) => ({
         ...h,
-        [mode]: [
+        [mode]: mode === 'ia' ? {
+          ...h[mode],
+          [difficulte]: [
+            ...h[mode][difficulte],
+            {
+              gagnant: etat.gagnant,
+              difficulte: difficulte,
+              date: new Date().toLocaleTimeString()
+            }
+          ]
+        } : [
           ...h[mode],
           {
             gagnant: etat.gagnant,
-            difficulte: difficulte,
             date: new Date().toLocaleTimeString()
           }
         ]
@@ -39,6 +64,20 @@ export default function App() {
       onEtatChange: (etat) => setEtat(etat)
     });
     moteurRef.current.reset();
+    // L'IA joue immédiatement si elle commence (joueur 'O')
+    if (mode === 'ia' && moteurRef.current.joueurActuel === 'O') {
+      setTimeout(() => {
+        let coupIA = null;
+        if (difficulte === 'facile') {
+          coupIA = jouerFacile(moteurRef.current.grille);
+        } else if (difficulte === 'moyenne') {
+          coupIA = jouerMoyenne(moteurRef.current.grille, 'O');
+        } else if (difficulte === 'difficile') {
+          coupIA = jouerMinimax(moteurRef.current.grille, 'O');
+        }
+        moteurRef.current.jouerCoup(coupIA); // L'IA joue ici
+      }, 100); // Petit délai pour que React mette à jour l'interface avant l'action de l'IA
+    }
   };
 
   const handleChoixMode = (choix) => {
@@ -59,6 +98,10 @@ export default function App() {
 
   const jouerCoup = (index) => {
     if (!moteurRef.current || etat.terminé) return;
+
+    // Si l'IA joue en premier, on empêche le joueur de jouer tant qu'elle n'a pas joué
+    if (mode === 'ia' && moteurRef.current.joueurActuel === 'O') return;
+
     const ok = moteurRef.current.jouerCoup(index);
 
     if (ok && mode === 'ia' && moteurRef.current.joueurActuel === 'O' && !etat.terminé) {
@@ -71,13 +114,14 @@ export default function App() {
         } else if (difficulte === 'difficile') {
           coupIA = jouerMinimax(moteurRef.current.grille, 'O');
         }
-        moteurRef.current.jouerCoup(coupIA);
-      }, 300);
+        moteurRef.current.jouerCoup(coupIA); // L'IA joue ici
+      }, 300); // Le délai pour que l'IA joue
     }
   };
 
   const redemarrer = () => {
     moteurRef.current?.reset();
+    initialiserMoteur(); // Redémarrer et réinitialiser le moteur pour laisser l'IA jouer si elle commence
   };
 
   return (
@@ -115,33 +159,76 @@ export default function App() {
           </p>
           <button onClick={redemarrer}>🔄 Rejouer</button>
           <button onClick={() => setEtape('menu')}>🏠 Retour au menu</button>
+          <button onClick={() => setEtape('difficulte')}>Changer de niveau</button>
 
-          <div style={{ marginTop: '20px' }}>
-            <h3>Score</h3>
-            <p>X : {score.X} | O : {score.O}</p>
+          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between' }}>
+            <div>
+              <h3>Score Joueur vs Joueur</h3>
+              <p>X : {score.joueur.X} | O : {score.joueur.O}</p>
+            </div>
+            <div>
+              <h3>Score Joueur vs IA - Facile</h3>
+              <p>X : {score.ia.facile.X} | O : {score.ia.facile.O}</p>
+            </div>
+            <div>
+              <h3>Score Joueur vs IA - Moyenne</h3>
+              <p>X : {score.ia.moyenne.X} | O : {score.ia.moyenne.O}</p>
+            </div>
+            <div>
+              <h3>Score Joueur vs IA - Difficile</h3>
+              <p>X : {score.ia.difficile.X} | O : {score.ia.difficile.O}</p>
+            </div>
           </div>
 
-          <div style={{ marginTop: '20px' }}>
-            <h3>Historique Joueur vs Joueur</h3>
-            <ul>
-              {historique.joueur.map((item, index) => (
-                <li key={index}>
-                  {item.date} - {item.gagnant === 'nul' ? 'Match nul' : `Victoire de ${item.gagnant}`}
-                </li>
-              ))}
-            </ul>
+          {mode === 'joueur' && (
+            <div style={{ marginTop: '20px' }}>
+              <h3>Historique Joueur vs Joueur</h3>
+              <ul>
+                {historique.joueur.map((item, index) => (
+                  <li key={index}>
+                    {item.date} - {item.gagnant === 'nul' ? 'Match nul' : `Victoire de ${item.gagnant}`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-            <h3>Historique Joueur vs IA</h3>
-            <ul>
-              {historique.ia.map((item, index) => (
-                <li key={index}>
-                  {item.date} - {item.gagnant === 'nul'
-                    ? 'Match nul'
-                    : `Victoire de ${item.gagnant} (${item.difficulte})`}
-                </li>
-              ))}
-            </ul>
-          </div>
+          {mode === 'ia' && (
+            <div style={{ marginTop: '20px' }}>
+              <h3>Historique Joueur vs IA - Facile</h3>
+              <ul>
+                {historique.ia.facile.map((item, index) => (
+                  <li key={index}>
+                    {item.date} - {item.gagnant === 'nul'
+                      ? 'Match nul'
+                      : `Victoire de ${item.gagnant} (${item.difficulte})`}
+                  </li>
+                ))}
+              </ul>
+
+              <h3>Historique Joueur vs IA - Moyenne</h3>
+              <ul>
+                {historique.ia.moyenne.map((item, index) => (
+                  <li key={index}>
+                    {item.date} - {item.gagnant === 'nul'
+                      ? 'Match nul'
+                      : `Victoire de ${item.gagnant} (${item.difficulte})`}
+                  </li>
+                ))}
+              </ul>
+
+              <h3>Historique Joueur vs IA - Difficile</h3>
+              <ul>
+                {historique.ia.difficile.map((item, index) => (
+                  <li key={index}>
+                    {item.date} - {item.gagnant === 'nul'
+                      ? 'Match nul'
+                      : `Victoire de ${item.gagnant} (${item.difficulte})`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>

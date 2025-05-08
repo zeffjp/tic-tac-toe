@@ -5,12 +5,13 @@ export class MoteurJeu {
     }
   
     reset() {
-      this.grille = Array(9).fill(null); // 3x3
-      this.joueurActuel = 'X';
+      this.grille = Array(9).fill(null);
+      this.joueurActuel = Math.random() < 0.5 ? 'X' : 'O'; // 👈 Choix aléatoire
       this.terminé = false;
       this.gagnant = null;
       this.onEtatChange(this.getEtat());
     }
+    
   
     getEtat() {
       return {

@@ -64,6 +64,7 @@ export default function App() {
       onEtatChange: (etat) => setEtat(etat)
     });
     moteurRef.current.reset();
+
     // L'IA joue immédiatement si elle commence (joueur 'O')
     if (mode === 'ia' && moteurRef.current.joueurActuel === 'O') {
       setTimeout(() => {
@@ -159,7 +160,11 @@ export default function App() {
           </p>
           <button onClick={redemarrer}>🔄 Rejouer</button>
           <button onClick={() => setEtape('menu')}>🏠 Retour au menu</button>
-          <button onClick={() => setEtape('difficulte')}>Changer de niveau</button>
+
+          {/* Afficher le bouton "Changer de niveau" seulement si mode IA */}
+          {mode === 'ia' && (
+            <button onClick={() => setEtape('difficulte')}>Changer de niveau</button>
+          )}
 
           <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between' }}>
             <div>
